@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import './index.css'
-import { Calculator, DollarSign, Clock, Download, RefreshCcw, TrendingUp, Moon, Shield, Gift, Users, UserCheck } from 'lucide-react'
+import { Calculator, DollarSign, Clock, Download, RefreshCcw, TrendingUp, Moon, Shield, Gift, Users, UserCheck, Tag, CheckCircle } from 'lucide-react'
 
 // Mattress Firm financing - all 0% APR
 // 24mo or less: 3% back as Visa gift card (min $1,999)
@@ -51,7 +51,7 @@ function App() {
   
   // New add-ons
   const [protectionPlan, setProtectionPlan] = useState<boolean>(false)
-  const [mattressProtector, setMattressProtector] = useState<boolean>(false)
+  const [mattressProtectorCount, setMattressProtectorCount] = useState<number>(0)
   const [deliveryOption, setDeliveryOption] = useState<string>('none')
   const [pillowCount, setPillowCount] = useState<number>(0)
   const [sheets, setSheets] = useState<boolean>(false)
@@ -67,34 +67,41 @@ function App() {
     + (mattressProtection ? mattressProtectionPrice : 0)
     + (baseProtection ? baseProtectionPrice : 0)
     + (protectionPlan ? 350 : 0)
-    + (mattressProtector ? 100 : 0)
+    + (mattressProtectorCount * 100)
     + deliveryPrice
     + (pillowCount * 100)
     + (sheets ? 100 : 0)
   
   const financedAmount = totalPrice - downPayment
   
-  // Manager Approval calculation (only customer-selected items)
+  // Manager Approval calculation
   const managerDiscount = 
     (mattressProtection ? mattressProtectionPrice : 0)
     + (baseProtection ? baseProtectionPrice : 0)
     + (protectionPlan ? 350 : 0)
-    + (mattressProtector ? 100 : 0)
+    + (mattressProtectorCount * 100)
     + deliveryPrice
     + (pillowCount * 100)
     + (sheets ? 100 : 0)
     + instantGiftPrice
   
-  const discountedTotal = totalPrice - managerDiscount
-  const ffDiscount = managerDiscount * 0.10
+  const managerNewTotal = totalPrice - managerDiscount
   
-  // Calculate monthly payment (all 0% APR, so simple division)
+  // Friends & Family - CORRECTED MATH: F&F = (Total - managerDiscount) × 0.10 = managerNewTotal × 0.10
+  const ffDiscount = managerNewTotal * 0.10
+  const ffNewTotal = managerNewTotal - ffDiscount
+  
+  // Clearance section - uses ONLY mattress price × 0.50
+  const clearanceDiscount = mattressPrice * 0.50
+  const clearanceNewTotal = mattressPrice * 0.50
+  
+  // Calculate monthly payment
   const calculateMonthly = (months: number) => {
     if (months === 0) return 0
     return financedAmount / months
   }
   
-  // Calculate gift card amount (3% back for 24mo or less, min $1,999)
+  // Calculate gift card amount
   const calculateGiftCard = (months: number) => {
     if (months <= 24 && totalPrice >= 1999) {
       return totalPrice * 0.03
@@ -105,10 +112,25 @@ function App() {
   const formatCurrency = (amount: number) => 
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
 
-  // Filter available options based on minimum spend
   const availableOptions = FINANCING_OPTIONS.filter(option => 
     totalPrice >= option.minSpend
   )
+
+  // Build "What's Included Free" list - dynamic, only show selected items
+  const freeItems: string[] = []
+  if (mattressProtection) freeItems.push(`Free 10-Year Mattress Protection (${formatCurrency(mattressProtectionPrice)})`)
+  if (baseProtection) freeItems.push(`Free 10-Year Base Protection (${formatCurrency(baseProtectionPrice)})`)
+  if (protectionPlan) freeItems.push(`Free Protection Plan (${formatCurrency(350)})`)
+  if (mattressProtectorCount > 0) freeItems.push(`Free Mattress Protector × ${mattressProtectorCount} (${formatCurrency(mattressProtectorCount * 100)})`)
+  if (deliveryOption === 'setup-haul') freeItems.push(`Free Setup + Haul Away (${formatCurrency(100)})`)
+  if (deliveryOption === 'base-setup-haul') freeItems.push(`Free Adjustable Base Setup + Haul Away (${formatCurrency(150)})`)
+  if (deliveryOption === 'base-setup-base-haul') freeItems.push(`Free Adjustable Base Setup + Adjustable Base Haul Away (${formatCurrency(180)})`)
+  if (pillowCount > 0) freeItems.push(`Free Pillows × ${pillowCount} (${formatCurrency(pillowCount * 100)})`)
+  if (sheets) freeItems.push(`Free Sheets (${formatCurrency(100)})`)
+  if (instantGift === '200') freeItems.push(`$200 Cash Back`)
+  if (instantGift === '300') freeItems.push(`$300 Cash Back`)
+  
+  const hasFreeItems = freeItems.length > 0
 
   // Reset function
   const handleReset = () => {
@@ -118,7 +140,7 @@ function App() {
     setMattressProtection(false)
     setBaseProtection(false)
     setProtectionPlan(false)
-    setMattressProtector(false)
+    setMattressProtectorCount(0)
     setDeliveryOption('none')
     setPillowCount(0)
     setSheets(false)
@@ -152,7 +174,7 @@ function App() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Price Inputs */}
+        {/* Build Your Sleep System */}
         <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-primary-400" />
@@ -215,7 +237,6 @@ function App() {
             </div>
           </div>
           
-          {/* Protection checkboxes */}
           <div className="mt-4 space-y-3">
             <div className="flex items-center gap-3">
               <input
@@ -244,7 +265,6 @@ function App() {
               </label>
             </div>
             
-            {/* New: Protection Plan checkbox */}
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"
@@ -259,22 +279,38 @@ function App() {
               </label>
             </div>
             
-            {/* New: Mattress Protector checkbox */}
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="mattressProtector"
-                checked={mattressProtector}
-                onChange={(e) => setMattressProtector(e.target.checked)}
-                className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-primary-600"
-              />
-              <label htmlFor="mattressProtector" className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-green-400" />
-                <span>Mattress Protector ({formatCurrency(100)})</span>
-              </label>
+            {/* CHANGE 1: Mattress Protector as stepper (0-10) */}
+            <div className="mt-4">
+              <label className="block text-sm text-gray-400 mb-2">Mattress Protector ({formatCurrency(100)} each)</label>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setMattressProtectorCount(Math.max(0, mattressProtectorCount - 1))}
+                  className="w-10 h-10 bg-gray-700 border border-gray-600 rounded-lg text-white hover:bg-gray-600"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={mattressProtectorCount}
+                  onChange={(e) => {
+                    const val = Number(e.target.value)
+                    setMattressProtectorCount(Math.min(10, Math.max(0, val)))
+                  }}
+                  min={0}
+                  max={10}
+                  className="w-20 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-center focus:border-primary-500 focus:outline-none"
+                />
+                <button
+                  onClick={() => setMattressProtectorCount(Math.min(10, mattressProtectorCount + 1))}
+                  className="w-10 h-10 bg-gray-700 border border-gray-600 rounded-lg text-white hover:bg-gray-600"
+                >
+                  +
+                </button>
+              </div>
             </div>
             
-            {/* New: Delivery radio group */}
+            {/* Delivery radio group */}
             <div className="mt-4">
               <label className="block text-sm text-gray-400 mb-2">Delivery & Setup</label>
               <div className="space-y-2">
@@ -297,7 +333,7 @@ function App() {
               </div>
             </div>
             
-            {/* New: Pillows number stepper */}
+            {/* Pillows stepper */}
             <div className="mt-4">
               <label className="block text-sm text-gray-400 mb-2">Pillows ({formatCurrency(100)} each)</label>
               <div className="flex items-center gap-3">
@@ -328,7 +364,7 @@ function App() {
               </div>
             </div>
             
-            {/* New: Sheets checkbox */}
+            {/* Sheets checkbox */}
             <div className="flex items-center gap-3 mt-4">
               <input
                 type="checkbox"
@@ -342,7 +378,7 @@ function App() {
               </label>
             </div>
             
-            {/* New: Instant Gift radio group */}
+            {/* Instant Gift radio group */}
             <div className="mt-4">
               <label className="block text-sm text-gray-400 mb-2">Instant Gift (manager approval ask only — does NOT add to customer total)</label>
               <div className="space-y-2">
@@ -410,7 +446,6 @@ function App() {
             })}
           </div>
           
-          {/* Gift Card Promo Banner */}
           {totalPrice >= 1999 && (
             <div className="mt-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg flex items-center gap-3">
               <Gift className="w-6 h-6 text-green-400" />
@@ -423,7 +458,6 @@ function App() {
             </div>
           )}
           
-          {/* 72 Month Requirement */}
           {totalPrice < 3299 && (
             <p className="mt-3 text-xs text-primary-200">
               * 72 months requires $3,299 minimum purchase
@@ -440,7 +474,7 @@ function App() {
           </p>
         </div>
 
-        {/* ROI Section - MOVED below per-night CTA */}
+        {/* ROI Section */}
         <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-green-400" />
@@ -472,7 +506,7 @@ function App() {
           </div>
         </div>
 
-        {/* Manager Approval Section - NEW */}
+        {/* Manager Approval Section - REORDERED: Discount Off ABOVE New Total */}
         <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
           <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
             <UserCheck className="w-5 h-5 text-yellow-400" />
@@ -481,18 +515,34 @@ function App() {
           <p className="text-gray-400 text-sm mb-4">Discount to offer with manager approval</p>
           
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 text-center">
-              <p className="text-yellow-200 text-sm">Discounted Total</p>
-              <p className="text-3xl font-bold text-yellow-400">{formatCurrency(discountedTotal)}</p>
-            </div>
             <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-4 text-center">
               <p className="text-green-200 text-sm">Discount Off</p>
               <p className="text-3xl font-bold text-green-400">{formatCurrency(managerDiscount)}</p>
             </div>
+            <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4 text-center">
+              <p className="text-yellow-200 text-sm">New Total</p>
+              <p className="text-3xl font-bold text-yellow-400">{formatCurrency(managerNewTotal)}</p>
+            </div>
           </div>
+          
+          {/* CHANGE 5: What's Included Free - dynamic list */}
+          {hasFreeItems && (
+            <div className="mt-4 pt-4 border-t border-gray-600">
+              <p className="text-sm text-gray-400 mb-2">What's Included Free</p>
+              <p className="text-xs text-gray-500 mb-2">Use this list when presenting to the customer.</p>
+              <ul className="space-y-1">
+                {freeItems.map((item, idx) => (
+                  <li key={idx} className="flex items-center gap-2 text-sm text-green-300">
+                    <CheckCircle className="w-4 h-4" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
-        {/* Friends & Family Discount Section - NEW */}
+        {/* Friends & Family - WITH New Total line */}
         <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
           <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
             <Users className="w-5 h-5 text-purple-400" />
@@ -500,12 +550,39 @@ function App() {
           </h2>
           <p className="text-gray-400 text-sm mb-4">10% of the manager-approved savings</p>
           
-          <div className="bg-purple-500/20 border border-purple-500/50 rounded-lg p-6 text-center">
-            <p className="text-4xl font-bold text-purple-400">{formatCurrency(ffDiscount)}</p>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-purple-500/20 border border-purple-500/50 rounded-lg p-4 text-center">
+              <p className="text-purple-200 text-sm">Discount Off</p>
+              <p className="text-3xl font-bold text-purple-400">{formatCurrency(ffDiscount)}</p>
+            </div>
+            <div className="bg-indigo-500/20 border border-indigo-500/50 rounded-lg p-4 text-center">
+              <p className="text-indigo-200 text-sm">New Total</p>
+              <p className="text-3xl font-bold text-indigo-400">{formatCurrency(ffNewTotal)}</p>
+            </div>
           </div>
         </div>
 
-        {/* Reset Button - at bottom */}
+        {/* CHANGE 6: Clearance Section - at bottom */}
+        <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
+          <h2 className="text-lg font-semibold mb-1 flex items-center gap-2">
+            <Tag className="w-5 h-5 text-red-400" />
+            Clearance
+          </h2>
+          <p className="text-gray-400 text-sm mb-4">If the mattress is on 50% off clearance</p>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-center">
+              <p className="text-red-200 text-sm">Discount Off</p>
+              <p className="text-3xl font-bold text-red-400">{formatCurrency(clearanceDiscount)}</p>
+            </div>
+            <div className="bg-orange-500/20 border border-orange-500/50 rounded-lg p-4 text-center">
+              <p className="text-orange-200 text-sm">New Total</p>
+              <p className="text-3xl font-bold text-orange-400">{formatCurrency(clearanceNewTotal)}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Reset Button */}
         <div className="text-center">
           <button 
             onClick={handleReset}
